@@ -1,0 +1,113 @@
+﻿@page "/"
+@using Newtonsoft.Json
+@using blzrwasm_d.Shared
+@inject HttpClient Http
+@inject IJSRuntime jsRuntime
+
+<PageTitle>Sign in</PageTitle>
+
+<section class="gradient-form h-100" style="background-color: #eee;">
+
+  <div class="container py-5 h-100">
+    <div class="row d-flex justify-content-center align-items-center h-100">
+      <div class="col-xl-10">
+        <div class="card rounded-3 text-black">
+          <div class="row g-0">
+            <div class="col-lg-6">
+              <div class="card-body p-md-2 mx-md-2">
+
+                <div class="text-center">
+                  <img src="https://www.flaghouse.ca//Images/Content/Logos/logo_CDN_ONE_Line.png"
+                    style="width: 185px;" alt="logo">
+                  <h4 class="mt-1 mb-5 pb-1">We are Flaghouse</h4>
+                </div>
+
+                <form>
+                  <p>Please login to your account</p>
+
+                  <div class="form-outline mb-2">
+                    <input type="email" id="usrInput" class="form-control" placeholder="Name or email address" @bind-value="usrValue" @onchange="usrChanged" @bind-value:event="oninput" style="-webkit-box-shadow:0 0 0px 1000px rgb(255,255,255) inset"/>
+                    <label class="form-label" for="usrInput">Username</label>
+                  </div>
+
+                  <div class="form-outline mb-2">
+                    <input type="password" id="pwdInput" class="form-control" @bind-value="pwdValue" @onchange="pwdChanged" @bind-value:event="oninput" @onkeydown="OnSubmit" style="-webkit-box-shadow:0 0 0px 1000px rgb(255,255,255) inset"/>
+                    <a href=""><i class="bi bi-eye-slash" aria-hidden="true" id="toggleVisible"></i></a>
+                    <label class="form-label" for="pwdInput">Password</label>
+                    <a class="text-muted" href="#!">Forgot?</a>
+                  </div>
+
+                  <div class="text-center pt-1 mb-2 pb-1">
+                    <button class="btn btn-primary btn-block fa-lg gradient-custom-2 mb-3" type="button" id="submitCreds" @onclick="OnSubmit" style="align-items:center; display:flex; margin-right:3px; justify-content:center; height:40px; background-color: rgb(128,128,225)">
+                        <span class="" id="submitImage" style="margin-right: 10px; height:24px; width:24px;"></span>
+                        Log in
+                    </button>
+                  </div>
+
+                  <input type="hidden" id="jdata" @bind-value="changeData" @bind-value:event="oninput"/>
+
+                  <div class="d-flex align-items-center justify-content-center pb-4">
+                    <p class="mb-0 me-2">Don't have an account?</p>
+                    <button type="button" class="btn btn-outline-danger">Create new</button>
+                  </div>
+
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+@code {
+    private string changeData = string.Empty;
+    private string? usrValue = string.Empty;
+    private string? pwdValue = string.Empty;
+
+    protected async override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await jsRuntime.InvokeVoidAsync("addListener");
+            await base.OnAfterRenderAsync(firstRender);
+        }
+    }
+
+    // https://stackoverflow.com/questions/58125929/blazor-how-to-use-the-onchange-event-in-select-when-using-bind-also
+    private void usrChanged(ChangeEventArgs e) { usrValue = e.Value?.ToString(); }
+    private void pwdChanged(ChangeEventArgs e) { pwdValue = e.Value?.ToString(); }
+    private async Task OnSubmit()
+    {
+        // use biometrics to validate
+        // forgot password -> email
+        // password ok -> next screen
+
+        changeData = "clicked";
+        string usr = (usrValue ?? string.Empty).ToLowerInvariant();
+        string pwd = (pwdValue ?? string.Empty).ToLowerInvariant();
+        if (usr.Any() & pwd.Any())
+        {
+            changeData = $"{usr} requested access";
+            List<User>? users = await Http.GetFromJsonAsync<List<User>>("/api/users");
+            Console.WriteLine(JsonConvert.SerializeObject(users, Formatting.Indented));
+            changeData = "received user list";
+
+            // 'bi bi-check', 'bi bi-question', 'bi bi-x', 'bi bi-globe'
+            if (users == null) {changeData = "bi bi-globe";} // no connection to mongodb?
+            else
+            {
+                foreach (User user in users)
+                {
+                    if (user.Email.ToLowerInvariant() == usr | user.Name.ToLowerInvariant() == usr)
+                    {
+                        changeData = user.Password.ToLowerInvariant() == pwd ? "bi bi-check" : "bi bi-x";
+                        break;
+                    }
+                }
+            }
+            changeData = changeData == "received user list" ? "bi bi-question" : changeData;   
+        }
+    }
+}
